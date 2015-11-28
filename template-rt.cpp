@@ -15,9 +15,6 @@
 #include <vector>
 using namespace std;
 
-int g_width;
-int g_height;
-
 struct Ray
 {
     vec4 origin;
@@ -45,19 +42,31 @@ struct Light
 	vec3 rgb;
 };
 
+// Resolution and pixel colors
+int g_width;
+int g_height;
 vector<vec4> g_colors;
 
+// Other colors
+vec3 background;
+vec3 ambient;
+
+// Frustrum
 float g_left;
 float g_right;
 float g_top;
 float g_bottom;
 float g_near;
 
+// Output filename
 char *outName;
 
+// Spheres
 Sphere spheres[5];
-Light lights[5];
 int sphereIndex = 0;
+
+// Lights
+Light lights[5];
 int lightIndex = 0;
 
 // -------------------------------------------------------------------
@@ -87,10 +96,7 @@ float toFloat(const string& s)
 
 void parseLine(const vector<string>& vs)
 {
-    //TODO: add parsing of NEAR, LEFT, RIGHT, BOTTOM, TOP, SPHERE, LIGHT, BACK, AMBIENT, OUTPUT.
-
-	//int sphereIndex = 0;
-	//int lightIndex = 0;
+    //DONE: add parsing of NEAR, LEFT, RIGHT, BOTTOM, TOP, SPHERE, LIGHT, BACK, AMBIENT, OUTPUT.
 	const int num_labels = 11;	//0		 1		 2		   3	   4	  5		  6			7		8		  9			10
 	const string labels[] = { "NEAR", "LEFT", "RIGHT", "BOTTOM", "TOP", "RES", "SPHERE", "LIGHT", "BACK", "AMBIENT", "OUTPUT" };
 	unsigned label_id = find( labels, labels + num_labels, vs[0] ) - labels;
@@ -137,10 +143,10 @@ void parseLine(const vector<string>& vs)
 			lightIndex++;
 			break;
 		case 8:		// BACK
-
+			background = vec3(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]));
 			break;
 		case 9:		// AMBIENT
-
+			ambient = vec3(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]));
 			break;
 		case 10:	// OUTPUT
 			int len = vs[1].length();
@@ -151,13 +157,6 @@ void parseLine(const vector<string>& vs)
 			outName[len] = '\0';
 			break;
 	}
-
-    //if (vs[0] == "RES")
-    //{
-    //    g_width = (int)toFloat(vs[1]);
-    //    g_height = (int)toFloat(vs[2]);
-    //    g_colors.resize(g_width * g_height);
-    //}
 }
 
 void loadFile(const char* filename)
