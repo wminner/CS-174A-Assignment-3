@@ -1,3 +1,7 @@
+// Wesley Minner
+// 703549234
+// CS 174A, Dis 1B, Fall 15
+
 //
 // template-rt.cpp
 //
@@ -21,6 +25,25 @@ struct Ray
 };
 
 // TODO: add structs for spheres, lights and anything else you may need.
+struct Sphere
+{
+	string name;
+	vec4 origin;
+	mat4 scale;
+	vec3 rgb;
+	float Ka;
+	float Kd;
+	float Ks;
+	float Kr;
+	float n;
+};
+
+struct Light
+{
+	string name;
+	vec4 origin;
+	vec3 rgb;
+};
 
 vector<vec4> g_colors;
 
@@ -30,9 +53,20 @@ float g_top;
 float g_bottom;
 float g_near;
 
+char *outName;
+
+Sphere spheres[5];
+Light lights[5];
+int sphereIndex = 0;
+int lightIndex = 0;
 
 // -------------------------------------------------------------------
 // Input file parsing
+
+inline vec3 toVec3(vec4 in)
+{
+	return vec3(in[0], in[1], in[2]);
+}
 
 vec4 toVec4(const string& s1, const string& s2, const string& s3)
 {
@@ -54,12 +88,76 @@ float toFloat(const string& s)
 void parseLine(const vector<string>& vs)
 {
     //TODO: add parsing of NEAR, LEFT, RIGHT, BOTTOM, TOP, SPHERE, LIGHT, BACK, AMBIENT, OUTPUT.
-    if (vs[0] == "RES")
-    {
-        g_width = (int)toFloat(vs[1]);
-        g_height = (int)toFloat(vs[2]);
-        g_colors.resize(g_width * g_height);
-    }
+
+	//int sphereIndex = 0;
+	//int lightIndex = 0;
+	const int num_labels = 11;	//0		 1		 2		   3	   4	  5		  6			7		8		  9			10
+	const string labels[] = { "NEAR", "LEFT", "RIGHT", "BOTTOM", "TOP", "RES", "SPHERE", "LIGHT", "BACK", "AMBIENT", "OUTPUT" };
+	unsigned label_id = find( labels, labels + num_labels, vs[0] ) - labels;
+
+	switch (label_id) {
+		case 0:		// NEAR
+			g_near = toFloat(vs[1]);
+			break;
+		case 1:		// LEFT
+			g_left = toFloat(vs[1]);
+			break;
+		case 2:		// RIGHT
+			g_right = toFloat(vs[1]);
+			break;
+		case 3:		// BOTTOM
+			g_bottom = toFloat(vs[1]);
+			break;
+		case 4:		// TOP
+			g_top = toFloat(vs[1]);
+			break;
+		case 5:		// RES
+			g_width = (int)toFloat(vs[1]);
+			g_height = (int)toFloat(vs[2]);
+			g_colors.resize(g_width * g_height);
+			break;
+		case 6:		// SPHERE
+			spheres[sphereIndex].name = vs[1];
+			spheres[sphereIndex].origin = toVec4(vs[2], vs[3], vs[4]);
+			spheres[sphereIndex].scale = Scale(vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7])));
+			spheres[sphereIndex].rgb = vec3(toFloat(vs[8]), toFloat(vs[9]), toFloat(vs[10]));
+			spheres[sphereIndex].Ka = toFloat(vs[11]);
+			spheres[sphereIndex].Kd = toFloat(vs[12]);
+			spheres[sphereIndex].Ks = toFloat(vs[13]);
+			spheres[sphereIndex].Kr = toFloat(vs[14]);
+			spheres[sphereIndex].n = toFloat(vs[15]);
+
+			sphereIndex++;
+			break;
+		case 7:		// LIGHT
+			lights[lightIndex].name = vs[1];
+			lights[lightIndex].origin = toVec4(vs[2], vs[3], vs[4]);
+			lights[lightIndex].rgb = vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7]));
+
+			lightIndex++;
+			break;
+		case 8:		// BACK
+
+			break;
+		case 9:		// AMBIENT
+
+			break;
+		case 10:	// OUTPUT
+			int len = vs[1].length();
+			outName = (char*)malloc(len+1);
+			for (int i = 0; i < len; i++) {
+				outName[i] = vs[1][i];
+			}
+			outName[len] = '\0';
+			break;
+	}
+
+    //if (vs[0] == "RES")
+    //{
+    //    g_width = (int)toFloat(vs[1]);
+    //    g_height = (int)toFloat(vs[2]);
+    //    g_colors.resize(g_width * g_height);
+    //}
 }
 
 void loadFile(const char* filename)
@@ -164,9 +262,18 @@ void savePPM(int Width, int Height, char* fname, unsigned char* pixels)
     fclose(fp);
 }
 
-void saveFile()
+void saveFile(char *inName)
 {
-    // Convert color components from floats to unsigned chars.
+	// The following is DEPRICATED in order to use the output name given in the file
+	//int len = strlen(inName);
+	//char *outName = (char*) malloc(len+1);
+	//strcpy(outName, inName);
+	//outName[len-3] = 'p';
+	//outName[len-2] = 'p';
+	//outName[len-1] = 'm';
+	//outName[len] = '\0';
+	
+	// Convert color components from floats to unsigned chars.
     // TODO: clamp values if out of range.
     unsigned char* buf = new unsigned char[g_width * g_height * 3];
     for (int y = 0; y < g_height; y++)
@@ -174,9 +281,11 @@ void saveFile()
             for (int i = 0; i < 3; i++)
                 buf[y*g_width*3+x*3+i] = (unsigned char)(((float*)g_colors[y*g_width+x])[i] * 255.9f);
     
-    // TODO: change file name based on input file name.
-    savePPM(g_width, g_height, "output.ppm", buf);
+    // DONE: change file name based on input file name.
+    //savePPM(g_width, g_height, "output.ppm", buf);
+	savePPM(g_width, g_height, outName, buf);
     delete[] buf;
+	free(outName);
 }
 
 
@@ -190,9 +299,21 @@ int main(int argc, char* argv[])
         cout << "Usage: template-rt <input_file.txt>" << endl;
         exit(1);
     }
+	//cout << argv[0] << endl;
+	//cout << argv[1] << endl;
     loadFile(argv[1]);
     render();
-    saveFile();
+    saveFile(argv[1]);
+
+	//for (int i = 0; i < sphereIndex; i++) {
+	//	delete &spheres[i];
+	//}
+	//for (int j = 0; j < lightIndex; j++) {
+	//	delete &lights[j];
+	//}
+	//delete[] spheres;
+	//delete[] lights;
+
 	return 0;
 }
 
