@@ -33,6 +33,8 @@ struct Sphere
 	float Ks;
 	float Kr;
 	float n;
+	mat4 sphereTrans;
+	mat4 invSphereTrans;
 };
 
 struct Light
@@ -62,7 +64,6 @@ float g_near;
 char *outName;
 
 // Spheres
-//Sphere spheres[5];
 vector<Sphere> spheres;
 int sphereIndex = 0;
 
@@ -135,6 +136,12 @@ void parseLine(const vector<string>& vs)
 			spheres[sphereIndex].Kr = toFloat(vs[14]);
 			spheres[sphereIndex].n = toFloat(vs[15]);
 
+			// Find sphere transform
+			spheres[sphereIndex].sphereTrans = Translate(spheres[sphereIndex].origin) * spheres[sphereIndex].scale;
+
+			// Find inverse sphere transform
+			InvertMatrix(spheres[sphereIndex].sphereTrans, spheres[sphereIndex].invSphereTrans);
+
 			sphereIndex++;
 			break;
 		case 7:		// LIGHT
@@ -200,9 +207,19 @@ void setColor(int ix, int iy, const vec4& color)
 
 // -------------------------------------------------------------------
 // Intersection routine
+vec4 findIntersect(const Ray& ray, const Sphere& sphere)
+{
+	// TODO: add your ray-sphere intersection routine here.
+	// Find Inverse transform ray
 
-// TODO: add your ray-sphere intersection routine here.
+	// Get untransformed sphere
 
+	// Use quadratic to find determinant
+
+	// Analyze determinant to find number of intersection points
+
+	// Take closest intersection point and recurse with trace function
+}
 
 // -------------------------------------------------------------------
 // Ray tracing
@@ -210,7 +227,23 @@ void setColor(int ix, int iy, const vec4& color)
 vec4 trace(const Ray& ray)
 {
     // TODO: implement your ray tracing routine here.
-    return vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	vec4 color_total;
+	vec4 color_local = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	vec4 color_reflected = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+	// Find closest intersection of ray with spheres
+	// Find intersection of ray for each sphere
+
+	// Find intersection closest to camera
+
+	// color_shadow = Sum(shadowRays(P,Lighti))
+
+	// Recursive call trace to find color_reflected
+
+	// Add up colors and scale color_reflected by sphere's Kr
+	color_total = color_local + color_reflected;
+    //return vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	return color_total;
 }
 
 vec4 getDir(int ix, int iy)
@@ -221,8 +254,8 @@ vec4 getDir(int ix, int iy)
 	float px;
 	float py;
 	float pz;
-	px = g_left + 2 * g_right*((float)ix / g_width);
-	py = g_top + 2 * g_bottom*((float)iy / g_height);
+	px = g_left + 2 * g_right*((float)ix / (g_width-1));	// Need (g_width-1) because we iterate from pixel 0 to res_x-1
+	py = g_top + 2 * g_bottom*((float)iy / (g_height-1));	// Need (g_height-1) because we iterate from pixel 0 to res_y-1
 	pz = -g_near;
 
 	dir = normalize(vec4(px, py, pz, 0.0f));
