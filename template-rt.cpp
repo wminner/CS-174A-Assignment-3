@@ -219,43 +219,89 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 {
 	// TODO: add your ray-sphere intersection routine here.
 	bool intersectFound = false;
+	Ray rayPrime;
 	float determ;
+	float solution[2] = { 0, 0 };
+	float minDist[2] = { 0, 0 };
+	vector<Intersect> isectList;
+	int isectNum = 0;
 	
 	// For each sphere in scene...
 	for (int i = 0; i < sphereIndex; i++) {
-		// Find Inverse transform ray
-
-		// Get untransformed sphere
-
+		// Find inverse transform ray
+		rayPrime.origin = normalize(g_spheres[i].invSphereTrans * ray.origin);	// Need to normalize? TODO
+		rayPrime.dir = normalize(g_spheres[i].invSphereTrans * ray.dir);		// Need to normalize? TODO
+		
+		// Find intersection of inverse transformed ray with unit sphere at origin
 		// Use quadratic to find determinant
-		determ = 0;
+		determ = pow(dot(rayPrime.origin, rayPrime.dir), 2) - pow(length(rayPrime.dir), 2) * (pow(length(rayPrime.origin), 2) - 1);
 
 		// Analyze determinant to find number of intersection points
 		if (determ < 0) {  // If determinant < 0, no intersect
-			;
+			;	// Do nothing
 		} 
 		else if (determ > 0) {  // If determinant > 0, two intersect
-			// Save closest of two intersection points
-			intersectFound = true;
+			// Get two solutions and find associated intersections
+			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) / pow(length(rayPrime.dir), 2)) + (determ / pow(length(rayPrime.dir), 2));
+			solution[1] = -1 * (dot(rayPrime.origin, rayPrime.dir) / pow(length(rayPrime.dir), 2)) - (determ / pow(length(rayPrime.dir), 2));
+			
+			// Save first intersection if within frustrum
+			if ((ray.origin + solution[0] * ray.dir).z <= -1) {
+				isectList.push_back(Intersect());
+				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
+				isectList[isectNum].norm = isectList[isectNum].pos - g_spheres[i].origin;
+				isectList[isectNum].dist = length(isectList[isectNum].pos);
+				isectList[isectNum].sphereNum = i;
+				isectNum++;
+				intersectFound = true;
+			}
+
+			// Save second intersection if within frustrum
+			if ((ray.origin + solution[1] * ray.dir).z <= -1) {
+				isectList.push_back(Intersect());
+				isectList[isectNum].pos = ray.origin + solution[1] * ray.dir;
+				isectList[isectNum].norm = isectList[isectNum].pos - g_spheres[i].origin;
+				isectList[isectNum].dist = length(isectList[isectNum].pos);
+				isectList[isectNum].sphereNum = i;
+				isectNum++;
+				intersectFound = true;
+			}
 		}
 		else if (determ == 0) {  // If determinant = 0, one intersect
-			// Save only intersection point
-			intersectFound = true;
+			// Get one solution and find associated intersection
+			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) / pow(length(rayPrime.dir), 2)) + (determ / pow(length(rayPrime.dir), 2));
+
+			// Save only intersection if within frustrum
+			if ((ray.origin + solution[0] * ray.dir).z <= -1) {
+				isectList.push_back(Intersect());
+				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
+				isectList[isectNum].norm = isectList[isectNum].pos - g_spheres[i].origin;
+				isectList[isectNum].dist = length(isectList[isectNum].pos);
+				isectList[isectNum].sphereNum = i;
+				isectNum++;
+				intersectFound = true;
+			}
 		}
 	}
-	// If found intersection point, return true
+	// If found intersection, look for intersection with smallest dist and return true
 	if (intersectFound) {
+		// Find the intersection with the smallest distance
+		intersect = isectList[0];
+		for (int j = 1; j < isectNum; j++) {	// Start from 1 because intersect.dist populated with isectList[0].dist initially
+			if (isectList[j].dist < intersect.dist) {
+				intersect = isectList[j];
+			}
+		}
 		return true;
 	}
-	else {  // Otherwise return false
+	else  // Otherwise return false
 		return false;
-	}
 }
 
 // -------------------------------------------------------------------
 // Ray tracing
 
-vec4 trace(const Ray& ray, int recurseDepth = 3)
+vec4 trace(const Ray& ray, int recurseDepth = 0)
 {
     // TODO: implement your ray tracing routine here.
 	Intersect intersect;
@@ -283,7 +329,7 @@ vec4 trace(const Ray& ray, int recurseDepth = 3)
 
 		// Find outgoing (reflected) ray based off incoming ray and intersect normal
 		reflectRay.origin = intersect.pos;
-		reflectRay.dir = ray.dir - 2 * dot(ray.dir, intersect.norm) * intersect.norm;		// Normalize? TODO
+		reflectRay.dir = normalize(ray.dir - 2 * dot(ray.dir, intersect.norm) * intersect.norm);		// Need to normalize? TODO
 
 		for (int p = 0; p < lightIndex; p++) {
 			// Get light direction from intersect point (normalized)
