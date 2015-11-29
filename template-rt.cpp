@@ -216,9 +216,16 @@ vec4 trace(const Ray& ray)
 vec4 getDir(int ix, int iy)
 {
     // TODO: modify this. This should return the direction from the origin
-    // to pixel (ix, iy), normalized.
+    // to pixel (ix, iy), normalized. (DONE but unverified)
     vec4 dir;
-    dir = vec4(0.0f, 0.0f, -1.0f, 0.0f);
+	float px;
+	float py;
+	float pz;
+	px = g_left + 2 * g_right*((float)ix / g_width);
+	py = g_top + 2 * g_bottom*((float)iy / g_height);
+	pz = -g_near;
+
+	dir = normalize(vec4(px, py, pz, 0.0f));
     return dir;
 }
 
