@@ -28,11 +28,11 @@ struct Sphere
 	vec4 origin;
 	mat4 scale;
 	vec3 rgb;
-	float Ka;
-	float Kd;
-	float Ks;
-	float Kr;
-	float n;
+	float Ka;				// Ambient coeffecient
+	float Kd;				// Diffuse coeffecient
+	float Ks;				// Specular coeffecient
+	float Kr;				// Reflective coeffecient
+	float n;				// Shininess
 	mat4 sphereTrans;
 	mat4 invSphereTrans;
 };
@@ -44,14 +44,22 @@ struct Light
 	vec3 rgb;
 };
 
+struct Intersect
+{
+	vec4 pos;		// Point position of intersect
+	vec4 norm;		// Normal vector at intersect
+	float dist;		// Distance of intersect point from camera
+	int sphereNum;	// Index of sphere that intersect occurred on
+};
+
 // Resolution and pixel colors
 int g_width;
 int g_height;
 vector<vec4> g_colors;
 
 // Other colors
-vec3 background;
-vec3 ambient;
+vec3 g_background;
+vec3 g_ambient;
 
 // Frustrum
 float g_left;
@@ -64,11 +72,11 @@ float g_near;
 char *outName;
 
 // Spheres
-vector<Sphere> spheres;
+vector<Sphere> g_spheres;
 int sphereIndex = 0;
 
 // Lights
-vector<Light> lights;
+vector<Light> g_lights;
 int lightIndex = 0;
 
 // -------------------------------------------------------------------
@@ -125,38 +133,38 @@ void parseLine(const vector<string>& vs)
 			g_colors.resize(g_width * g_height);
 			break;
 		case 6:		// SPHERE
-			spheres.push_back(Sphere());
-			spheres[sphereIndex].name = vs[1];
-			spheres[sphereIndex].origin = toVec4(vs[2], vs[3], vs[4]);
-			spheres[sphereIndex].scale = Scale(vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7])));
-			spheres[sphereIndex].rgb = vec3(toFloat(vs[8]), toFloat(vs[9]), toFloat(vs[10]));
-			spheres[sphereIndex].Ka = toFloat(vs[11]);
-			spheres[sphereIndex].Kd = toFloat(vs[12]);
-			spheres[sphereIndex].Ks = toFloat(vs[13]);
-			spheres[sphereIndex].Kr = toFloat(vs[14]);
-			spheres[sphereIndex].n = toFloat(vs[15]);
+			g_spheres.push_back(Sphere());
+			g_spheres[sphereIndex].name = vs[1];
+			g_spheres[sphereIndex].origin = toVec4(vs[2], vs[3], vs[4]);
+			g_spheres[sphereIndex].scale = Scale(vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7])));
+			g_spheres[sphereIndex].rgb = vec3(toFloat(vs[8]), toFloat(vs[9]), toFloat(vs[10]));
+			g_spheres[sphereIndex].Ka = toFloat(vs[11]);
+			g_spheres[sphereIndex].Kd = toFloat(vs[12]);
+			g_spheres[sphereIndex].Ks = toFloat(vs[13]);
+			g_spheres[sphereIndex].Kr = toFloat(vs[14]);
+			g_spheres[sphereIndex].n = toFloat(vs[15]);
 
 			// Find sphere transform
-			spheres[sphereIndex].sphereTrans = Translate(spheres[sphereIndex].origin) * spheres[sphereIndex].scale;
+			g_spheres[sphereIndex].sphereTrans = Translate(g_spheres[sphereIndex].origin) * g_spheres[sphereIndex].scale;
 
 			// Find inverse sphere transform
-			InvertMatrix(spheres[sphereIndex].sphereTrans, spheres[sphereIndex].invSphereTrans);
+			InvertMatrix(g_spheres[sphereIndex].sphereTrans, g_spheres[sphereIndex].invSphereTrans);
 
 			sphereIndex++;
 			break;
 		case 7:		// LIGHT
-			lights.push_back(Light());
-			lights[lightIndex].name = vs[1];
-			lights[lightIndex].origin = toVec4(vs[2], vs[3], vs[4]);
-			lights[lightIndex].rgb = vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7]));
+			g_lights.push_back(Light());
+			g_lights[lightIndex].name = vs[1];
+			g_lights[lightIndex].origin = toVec4(vs[2], vs[3], vs[4]);
+			g_lights[lightIndex].rgb = vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7]));
 
 			lightIndex++;
 			break;
 		case 8:		// BACK
-			background = vec3(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]));
+			g_background = vec3(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]));
 			break;
 		case 9:		// AMBIENT
-			ambient = vec3(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]));
+			g_ambient = vec3(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]));
 			break;
 		case 10:	// OUTPUT
 			int len = vs[1].length();
@@ -207,42 +215,95 @@ void setColor(int ix, int iy, const vec4& color)
 
 // -------------------------------------------------------------------
 // Intersection routine
-vec4 findIntersect(const Ray& ray, const Sphere& sphere)
+bool IntersectRay(const Ray &ray, Intersect &intersect)
 {
 	// TODO: add your ray-sphere intersection routine here.
-	// Find Inverse transform ray
+	bool intersectFound = false;
+	float determ;
+	
+	// For each sphere in scene...
+	for (int i = 0; i < sphereIndex; i++) {
+		// Find Inverse transform ray
 
-	// Get untransformed sphere
+		// Get untransformed sphere
 
-	// Use quadratic to find determinant
+		// Use quadratic to find determinant
+		determ = 0;
 
-	// Analyze determinant to find number of intersection points
-
-	// Take closest intersection point and recurse with trace function
+		// Analyze determinant to find number of intersection points
+		if (determ < 0) {  // If determinant < 0, no intersect
+			;
+		} 
+		else if (determ > 0) {  // If determinant > 0, two intersect
+			// Save closest of two intersection points
+			intersectFound = true;
+		}
+		else if (determ == 0) {  // If determinant = 0, one intersect
+			// Save only intersection point
+			intersectFound = true;
+		}
+	}
+	// If found intersection point, return true
+	if (intersectFound) {
+		return true;
+	}
+	else {  // Otherwise return false
+		return false;
+	}
 }
 
 // -------------------------------------------------------------------
 // Ray tracing
 
-vec4 trace(const Ray& ray)
+vec4 trace(const Ray& ray, int recurseDepth = 3)
 {
     // TODO: implement your ray tracing routine here.
+	Intersect intersect;
+	Sphere *targetSphere;
+	Ray reflectRay;
+	vec4 light_dir;
 	vec4 color_total;
-	vec4 color_local = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	vec3 color_ambient = vec3();
+	vec3 color_diffuse = vec3();
+	vec3 color_specular = vec3();
+	vec3 color_local = vec3();
 	vec4 color_reflected = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	
 
-	// Find closest intersection of ray with spheres
-	// Find intersection of ray for each sphere
+	// Find intersection of ray for each sphere and return closest one to camera
+	bool isectFound = IntersectRay(ray, intersect);
+	if (!isectFound) {  // If no intersection then assign background color to pixel
+		return vec4(g_background);
+	}
+	else {
+		// Find local color, which depends on each light source and shadow rays (TODO implement shadow consideration)
+		// color_shadow = Sum(shadowRays(P,Lighti))
+		// If dot product of surface normal with light direction is negative, then object is shadowing itself, no need to trace ray
+		targetSphere = &g_spheres[intersect.sphereNum];
 
-	// Find intersection closest to camera
+		// Find outgoing (reflected) ray based off incoming ray and intersect normal
+		reflectRay.origin = intersect.pos;
+		reflectRay.dir = ray.dir - 2 * dot(ray.dir, intersect.norm) * intersect.norm;		// Normalize? TODO
 
-	// color_shadow = Sum(shadowRays(P,Lighti))
+		for (int p = 0; p < lightIndex; p++) {
+			// Get light direction from intersect point (normalized)
+			light_dir = normalize(g_lights[p].origin - intersect.pos);
 
-	// Recursive call trace to find color_reflected
+			// Sum up diffuse and specular components for each point light
+			color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(intersect.norm, light_dir) * targetSphere->rgb;
+			color_specular += targetSphere->Ks * g_lights[p].rgb * pow(dot(reflectRay.dir, -intersect.pos), targetSphere->n);
+		}
+		color_ambient = targetSphere->Ka * (targetSphere->rgb + g_ambient);
+		color_local = color_ambient + color_diffuse + color_specular;
+
+		// Recursive call trace to find color_reflected
+		if (recurseDepth > 0) {
+			color_reflected = trace(reflectRay, recurseDepth - 1);
+		}
+	}	
 
 	// Add up colors and scale color_reflected by sphere's Kr
-	color_total = color_local + color_reflected;
-    //return vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	color_total = vec4(color_local) + targetSphere->Kr * color_reflected;
 	return color_total;
 }
 
@@ -308,14 +369,14 @@ void saveFile(char *inName)
 {
 	unsigned char temp;
 	// Convert color components from floats to unsigned chars.
-    // TODO: clamp values if out of range. (DONE but unverified)
+    // DONE: clamp values if out of range
     unsigned char* buf = new unsigned char[g_width * g_height * 3];
     for (int y = 0; y < g_height; y++)
         for (int x = 0; x < g_width; x++)
-			for (int i = 0; i < 3; i++) {		// Go through r, g, b values
-				temp = (unsigned char)(((float*)g_colors[y*g_width + x])[i] * 255.9f);
-				temp = (temp > 255 ? 255 : temp);
-				//buf[y*g_width*3 + x*3 + i] = (unsigned char)(((float*)g_colors[y*g_width + x])[i] * 255.9f);
+			for (int i = 0; i < 3; i++) {		// Go through r, g, b values (skip alpha channel)
+				temp = ((float*)g_colors[y*g_width + x])[i];
+				temp = (temp > 1 ? 1 : temp);
+				temp = (unsigned char)(temp * 255.9f);
 				buf[y*g_width * 3 + x * 3 + i] = temp;
 			}
     // DONE: change file name based on input file name.
