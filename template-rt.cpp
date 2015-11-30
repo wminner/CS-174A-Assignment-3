@@ -15,6 +15,8 @@
 #include <vector>
 using namespace std;
 
+int g_recurse = 3;	// Number of times to recursively call trace when calculating reflected colors
+
 struct Ray
 {
     vec4 origin;
@@ -209,6 +211,8 @@ void loadFile(const char* filename)
 void setColor(int ix, int iy, const vec4& color)
 {
     int iy2 = g_height - iy - 1; // Invert iy coordinate.
+	//if (iy2*g_width + ix == 41209)
+	//	cout << "here";
     g_colors[iy2 * g_width + ix] = color;
 }
 
@@ -225,6 +229,7 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 	float minDist[2] = { 0, 0 };
 	vector<Intersect> isectList;
 	int isectNum = 0;
+	float cabs_squared;		// Used to save on calculating Abs(c)^2 multiple times
 	
 	// For each sphere in scene...
 	for (int i = 0; i < sphereIndex; i++) {
@@ -235,7 +240,8 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 		// Find intersection of inverse transformed ray with unit sphere at origin
 		// Use quadratic to find determinant
 		//determ = pow(dot(rayPrime.origin, rayPrime.dir), 2) - pow(length(rayPrime.dir), 2) * (pow(length(rayPrime.origin), 2) - 1);
-		determ = pow(dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)), 2) - dot(toVec3(rayPrime.dir), toVec3(rayPrime.dir)) * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.origin)) - 1);
+		cabs_squared = dot(toVec3(rayPrime.dir), toVec3(rayPrime.dir));
+		determ = pow(dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)), 2) - cabs_squared * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.origin)) - 1);
 
 		// Analyze determinant to find number of intersection points
 		if (determ < 0) {  // If determinant < 0, no intersect
@@ -243,8 +249,8 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 		} 
 		else if (determ > 0) {  // If determinant > 0, two intersect
 			// Get two solutions and find associated intersections
-			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) + sqrt(determ)) / pow(length(rayPrime.dir), 2);
-			solution[1] = -1 * (dot(rayPrime.origin, rayPrime.dir) - sqrt(determ)) / pow(length(rayPrime.dir), 2);
+			solution[0] = -1 * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)) + sqrt(determ)) / cabs_squared;
+			solution[1] = -1 * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)) - sqrt(determ)) / cabs_squared;
 			
 			// Save first intersection if within frustrum
 			if ((ray.origin + solution[0] * ray.dir).z <= -g_near) {
@@ -270,7 +276,7 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 		}
 		else if (determ == 0) {  // If determinant = 0, one intersect
 			// Get one solution and find associated intersection
-			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) + sqrt(determ)) / pow(length(rayPrime.dir), 2);
+			solution[0] = -1 * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)) + sqrt(determ)) / cabs_squared;
 
 			// Save only intersection if within frustrum
 			if ((ray.origin + solution[0] * ray.dir).z <= -g_near) {
@@ -302,7 +308,7 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 // -------------------------------------------------------------------
 // Ray tracing
 
-vec4 trace(const Ray& ray, int recurseDepth = 0)
+vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 {
     // TODO: implement your ray tracing routine here.
 	Intersect intersect;
@@ -330,18 +336,20 @@ vec4 trace(const Ray& ray, int recurseDepth = 0)
 
 		// Find outgoing (reflected) ray based off incoming ray and intersect normal
 		reflectRay.origin = intersect.pos;
-		reflectRay.dir = normalize(ray.dir - 2 * dot(ray.dir, intersect.norm) * intersect.norm);		// Need to normalize? TODO
+		reflectRay.dir = normalize(ray.dir - 2 * dot(toVec3(ray.dir), toVec3(intersect.norm)) * intersect.norm);		// Need to normalize? TODO
 
-		for (int p = 0; p < lightIndex; p++) {
+		for (int p = 0; p < lightIndex; p++) {	// For all light sources...
 			// Get light direction from intersect point (normalized)
-			light_dir = normalize(g_lights[p].origin - intersect.pos);
+			light_dir = normalize(g_lights[p].origin - intersect.pos);		// Need to normalize? TODO
 
 			// Sum up diffuse and specular components for each point light
-			color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(intersect.norm, light_dir) * targetSphere->rgb;
-			color_specular += targetSphere->Ks * g_lights[p].rgb * pow(dot(reflectRay.dir, -intersect.pos), targetSphere->n);
+			color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(toVec3(intersect.norm), toVec3(light_dir)) * targetSphere->rgb;
+			color_specular +=  g_lights[p].rgb * (targetSphere->Ks * pow(dot(toVec3(reflectRay.dir), toVec3(normalize(-intersect.pos))), targetSphere->n));  // Need to normalize V before dotting with R
 		}
-		color_ambient = targetSphere->Ka * (targetSphere->rgb + g_ambient);
+		color_ambient = targetSphere->Ka * (targetSphere->rgb * g_ambient);	// + the ambient?
 		color_local = color_ambient + color_diffuse + color_specular;
+		//if (color_local.x == 0 && color_local.y == 0 && color_local.z == 0)
+		//	cout << "zero";
 
 		// Recursive call trace to find color_reflected
 		if (recurseDepth > 0)
@@ -362,7 +370,7 @@ vec4 getDir(int ix, int iy)
 	float py;
 	float pz;
 	px = g_left + 2 * g_right*((float)ix / (g_width-1));	// Need (g_width-1) because we iterate from pixel 0 to res_x-1
-	py = g_top + 2 * g_bottom*((float)iy / (g_height-1));	// Need (g_height-1) because we iterate from pixel 0 to res_y-1
+	py = g_bottom + 2 * g_top*((float)iy / (g_height-1));	// Need (g_height-1) because we iterate from pixel 0 to res_y-1
 	pz = -g_near;
 
 	dir = normalize(vec4(px, py, pz, 0.0f));
@@ -374,6 +382,8 @@ void renderPixel(int ix, int iy)
     Ray ray;
     ray.origin = vec4(0.0f, 0.0f, 0.0f, 1.0f);
     ray.dir = getDir(ix, iy);
+	//if (iy == 531 && ix == 409)
+	//	cout << "here";
     vec4 color = trace(ray);
     setColor(ix, iy, color);
 }
@@ -413,7 +423,7 @@ void savePPM(int Width, int Height, char* fname, unsigned char* pixels)
 
 void saveFile(char *inName)
 {
-	unsigned char temp;
+	float temp;
 	// Convert color components from floats to unsigned chars.
     // DONE: clamp values if out of range
     unsigned char* buf = new unsigned char[g_width * g_height * 3];
@@ -421,9 +431,10 @@ void saveFile(char *inName)
         for (int x = 0; x < g_width; x++)
 			for (int i = 0; i < 3; i++) {		// Go through r, g, b values (skip alpha channel)
 				temp = ((float*)g_colors[y*g_width + x])[i];
+				//if (y*g_width + x == 41209)
+				//	cout << "here";
 				temp = (temp > 1 ? 1 : temp);
-				temp = (unsigned char)(temp * 255.9f);
-				buf[y*g_width * 3 + x * 3 + i] = temp;
+				buf[y*g_width*3 + x*3 + i] = (unsigned char)(temp * 255.9f);
 			}
     // DONE: change file name based on input file name.
 	savePPM(g_width, g_height, outName, buf);
