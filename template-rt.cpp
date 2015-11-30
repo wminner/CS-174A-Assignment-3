@@ -229,12 +229,13 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 	// For each sphere in scene...
 	for (int i = 0; i < sphereIndex; i++) {
 		// Find inverse transform ray
-		rayPrime.origin = normalize(g_spheres[i].invSphereTrans * ray.origin);	// Need to normalize? TODO
+		rayPrime.origin = (g_spheres[i].invSphereTrans * ray.origin);	// Need to normalize? TODO
 		rayPrime.dir = normalize(g_spheres[i].invSphereTrans * ray.dir);		// Need to normalize? TODO
 		
 		// Find intersection of inverse transformed ray with unit sphere at origin
 		// Use quadratic to find determinant
-		determ = pow(dot(rayPrime.origin, rayPrime.dir), 2) - pow(length(rayPrime.dir), 2) * (pow(length(rayPrime.origin), 2) - 1);
+		//determ = pow(dot(rayPrime.origin, rayPrime.dir), 2) - pow(length(rayPrime.dir), 2) * (pow(length(rayPrime.origin), 2) - 1);
+		determ = pow(dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)), 2) - dot(toVec3(rayPrime.dir), toVec3(rayPrime.dir)) * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.origin)) - 1);
 
 		// Analyze determinant to find number of intersection points
 		if (determ < 0) {  // If determinant < 0, no intersect
@@ -242,14 +243,14 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 		} 
 		else if (determ > 0) {  // If determinant > 0, two intersect
 			// Get two solutions and find associated intersections
-			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) / pow(length(rayPrime.dir), 2)) + (determ / pow(length(rayPrime.dir), 2));
-			solution[1] = -1 * (dot(rayPrime.origin, rayPrime.dir) / pow(length(rayPrime.dir), 2)) - (determ / pow(length(rayPrime.dir), 2));
+			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) + sqrt(determ)) / pow(length(rayPrime.dir), 2);
+			solution[1] = -1 * (dot(rayPrime.origin, rayPrime.dir) - sqrt(determ)) / pow(length(rayPrime.dir), 2);
 			
 			// Save first intersection if within frustrum
-			if ((ray.origin + solution[0] * ray.dir).z <= -1) {
+			if ((ray.origin + solution[0] * ray.dir).z <= -g_near) {
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = isectList[isectNum].pos - g_spheres[i].origin;
+				isectList[isectNum].norm = normalize(isectList[isectNum].pos - g_spheres[i].origin);
 				isectList[isectNum].dist = length(isectList[isectNum].pos);
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -257,10 +258,10 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			}
 
 			// Save second intersection if within frustrum
-			if ((ray.origin + solution[1] * ray.dir).z <= -1) {
+			if ((ray.origin + solution[1] * ray.dir).z <= -g_near) {
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[1] * ray.dir;
-				isectList[isectNum].norm = isectList[isectNum].pos - g_spheres[i].origin;
+				isectList[isectNum].norm = normalize(isectList[isectNum].pos - g_spheres[i].origin);
 				isectList[isectNum].dist = length(isectList[isectNum].pos);
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -269,13 +270,13 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 		}
 		else if (determ == 0) {  // If determinant = 0, one intersect
 			// Get one solution and find associated intersection
-			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) / pow(length(rayPrime.dir), 2)) + (determ / pow(length(rayPrime.dir), 2));
+			solution[0] = -1 * (dot(rayPrime.origin, rayPrime.dir) + sqrt(determ)) / pow(length(rayPrime.dir), 2);
 
 			// Save only intersection if within frustrum
-			if ((ray.origin + solution[0] * ray.dir).z <= -1) {
+			if ((ray.origin + solution[0] * ray.dir).z <= -g_near) {
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = isectList[isectNum].pos - g_spheres[i].origin;
+				isectList[isectNum].norm = normalize(isectList[isectNum].pos - g_spheres[i].origin);
 				isectList[isectNum].dist = length(isectList[isectNum].pos);
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -343,14 +344,13 @@ vec4 trace(const Ray& ray, int recurseDepth = 0)
 		color_local = color_ambient + color_diffuse + color_specular;
 
 		// Recursive call trace to find color_reflected
-		if (recurseDepth > 0) {
+		if (recurseDepth > 0)
 			color_reflected = trace(reflectRay, recurseDepth - 1);
-		}
-	}	
 
-	// Add up colors and scale color_reflected by sphere's Kr
-	color_total = vec4(color_local) + targetSphere->Kr * color_reflected;
-	return color_total;
+		// Add up colors and scale color_reflected by sphere's Kr
+		color_total = vec4(color_local) + targetSphere->Kr * color_reflected;
+		return color_total;
+	}	
 }
 
 vec4 getDir(int ix, int iy)
