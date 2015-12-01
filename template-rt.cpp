@@ -252,22 +252,22 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			solution[1] = -1 * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)) - sqrt(determ)) / cabs_squared;
 			
 			// Save first intersection if within frustrum
-			if ((ray.origin + solution[0] * ray.dir).z <= -g_near) {
+			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = normalize(isectList[isectNum].pos - g_spheres[i].origin);
-				isectList[isectNum].dist = length(isectList[isectNum].pos);
+				isectList[isectNum].norm = vec4(normalize(toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)), 0.0);
+				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
 				intersectFound = true;
 			}
 
 			// Save second intersection if within frustrum
-			if ((ray.origin + solution[1] * ray.dir).z <= -g_near) {
+			if ((ray.origin + solution[1] * ray.dir).z <= -g_near && solution[1] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[1] * ray.dir;
-				isectList[isectNum].norm = normalize(isectList[isectNum].pos - g_spheres[i].origin);
-				isectList[isectNum].dist = length(isectList[isectNum].pos);
+				isectList[isectNum].norm = vec4(normalize(toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)), 0.0);
+				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
 				intersectFound = true;
@@ -278,11 +278,11 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			solution[0] = -1 * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)) + sqrt(determ)) / cabs_squared;
 
 			// Save only intersection if within frustrum
-			if ((ray.origin + solution[0] * ray.dir).z <= -g_near) {
+			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = normalize(isectList[isectNum].pos - g_spheres[i].origin);
-				isectList[isectNum].dist = length(isectList[isectNum].pos);
+				isectList[isectNum].norm = vec4(normalize(toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)), 0.0);
+				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
 				intersectFound = true;
@@ -362,21 +362,21 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 
 		// Find outgoing (reflected) ray based off incoming ray and intersect normal
 		reflectRay.origin = intersect.pos;
-		reflectRay.dir = normalize(ray.dir - 2 * dot(toVec3(ray.dir), toVec3(intersect.norm)) * intersect.norm);		// Need to normalize? TODO
+		reflectRay.dir = normalize(ray.dir - 2 * dot(ray.dir, intersect.norm) * intersect.norm);		// Need to normalize? TODO
 
 		for (int p = 0; p < lightIndex; p++) {	// For all light sources...
 			// Get light direction from intersect point (normalized)
 			light_dir = normalize(g_lights[p].origin - intersect.pos);		// Need to normalize? TODO
             shadowRay.dir = light_dir;
-            shadowRay.origin = intersect.pos;
+			shadowRay.origin = intersect.pos;// +intersect.norm * 0.0001f;	// Add 0.0001 so it doesn't detect intersection on itself
 
             if (!inShadow(shadowRay, intersect, g_lights[p])) {   // If intersection not in shadow, light contributes color
                 // Sum up diffuse and specular components for each point light
-                color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(toVec3(intersect.norm), toVec3(light_dir)) * targetSphere->rgb;
-                color_specular +=  g_lights[p].rgb * (targetSphere->Ks * pow(dot(toVec3(reflectRay.dir), toVec3(normalize(-intersect.pos))), targetSphere->n));  // Need to normalize V before dotting with R
+                color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(intersect.norm, light_dir) * targetSphere->rgb;
+                color_specular += targetSphere->Ks * g_lights[p].rgb * pow(dot(reflectRay.dir, normalize(intersect.pos - ray.origin)), targetSphere->n);  // Need to normalize V before dotting with R
             }
 		}
-		color_ambient = targetSphere->Ka * (targetSphere->rgb * g_ambient);	// + the ambient?
+		color_ambient = targetSphere->Ka * (targetSphere->rgb * g_ambient);
 		color_local = color_ambient + color_diffuse + color_specular;
 		//if (color_local.x == 0 && color_local.y == 0 && color_local.z == 0)
 		//	cout << "zero";
@@ -386,7 +386,7 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 			color_reflected = trace(reflectRay, recurseDepth - 1);
 
 		// Add up colors and scale color_reflected by sphere's Kr
-		color_total = vec4(color_local) + targetSphere->Kr * color_reflected;
+		color_total = vec4(color_local, 0.0) + targetSphere->Kr * color_reflected;
 		return color_total;
 	}	
 }
