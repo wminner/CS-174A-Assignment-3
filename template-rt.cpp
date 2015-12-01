@@ -226,7 +226,6 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 	Ray rayPrime;
 	float determ;
 	float solution[2] = { 0, 0 };
-	float minDist[2] = { 0, 0 };
 	vector<Intersect> isectList;
 	int isectNum = 0;
 	float cabs_squared;		// Used to save on calculating Abs(c)^2 multiple times
@@ -234,7 +233,7 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 	// For each sphere in scene...
 	for (int i = 0; i < sphereIndex; i++) {
 		// Find inverse transform ray
-		rayPrime.origin = (g_spheres[i].invSphereTrans * ray.origin);	// Need to normalize? TODO
+		rayPrime.origin = (g_spheres[i].invSphereTrans * ray.origin);
 		rayPrime.dir = normalize(g_spheres[i].invSphereTrans * ray.dir);		// Need to normalize? TODO
 		
 		// Find intersection of inverse transformed ray with unit sphere at origin
@@ -306,14 +305,41 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 }
 
 // -------------------------------------------------------------------
+// Detect shadow
+
+bool inShadow(const Ray &shadowRay, const Intersect &intersect, const Light &light)
+{
+    float dist_light;
+    Intersect shadowIntersect;
+    
+    // If dot product of intersect normal and shadowRay direction is negative, then return true
+    if (dot(shadowRay.dir, intersect.norm) < 0)
+        return true;
+    
+    // Find distance from light origin to shadowRay origin
+    dist_light = length(light.origin - shadowRay.origin);
+    
+    // For every sphere, detect intersection and save shortest distance to shadowRay origin
+    if (IntersectRay(shadowRay, shadowIntersect)) {
+        // If intersect dist shorter than light distance, then return true
+        if (shadowIntersect.dist < dist_light)
+            return true;
+        else
+            return false;
+    }
+    return false;   // Return false if no intersects detected
+}
+
+// -------------------------------------------------------------------
 // Ray tracing
 
 vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 {
     // TODO: implement your ray tracing routine here.
-	Intersect intersect;
+    Intersect intersect;
 	Sphere *targetSphere;
 	Ray reflectRay;
+    Ray shadowRay;
 	vec4 light_dir;
 	vec4 color_total;
 	vec3 color_ambient = vec3();
@@ -341,10 +367,14 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 		for (int p = 0; p < lightIndex; p++) {	// For all light sources...
 			// Get light direction from intersect point (normalized)
 			light_dir = normalize(g_lights[p].origin - intersect.pos);		// Need to normalize? TODO
+            shadowRay.dir = light_dir;
+            shadowRay.origin = intersect.pos;
 
-			// Sum up diffuse and specular components for each point light
-			color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(toVec3(intersect.norm), toVec3(light_dir)) * targetSphere->rgb;
-			color_specular +=  g_lights[p].rgb * (targetSphere->Ks * pow(dot(toVec3(reflectRay.dir), toVec3(normalize(-intersect.pos))), targetSphere->n));  // Need to normalize V before dotting with R
+            if (!inShadow(shadowRay, intersect, g_lights[p])) {   // If intersection not in shadow, light contributes color
+                // Sum up diffuse and specular components for each point light
+                color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(toVec3(intersect.norm), toVec3(light_dir)) * targetSphere->rgb;
+                color_specular +=  g_lights[p].rgb * (targetSphere->Ks * pow(dot(toVec3(reflectRay.dir), toVec3(normalize(-intersect.pos))), targetSphere->n));  // Need to normalize V before dotting with R
+            }
 		}
 		color_ambient = targetSphere->Ka * (targetSphere->rgb * g_ambient);	// + the ambient?
 		color_local = color_ambient + color_diffuse + color_specular;
