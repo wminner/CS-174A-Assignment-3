@@ -227,6 +227,9 @@ struct vec3 {
         float r = float(1.0) / s;
         return *this * r;
     }
+	
+	vec3 operator / ( const vec3& v ) const
+	{ return vec3( x/v.x, y/v.y, z/v.z ); }
 
     //
     //  --- (modifying) Arithematic Operators ---

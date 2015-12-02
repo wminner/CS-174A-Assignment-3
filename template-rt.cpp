@@ -28,7 +28,7 @@ struct Sphere
 {
 	string name;
 	vec4 origin;
-	mat4 scale;
+	vec3 scale;
 	vec3 rgb;
 	float Ka;				// Ambient coeffecient
 	float Kd;				// Diffuse coeffecient
@@ -138,7 +138,7 @@ void parseLine(const vector<string>& vs)
 			g_spheres.push_back(Sphere());
 			g_spheres[sphereIndex].name = vs[1];
 			g_spheres[sphereIndex].origin = toVec4(vs[2], vs[3], vs[4]);
-			g_spheres[sphereIndex].scale = Scale(vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7])));
+			g_spheres[sphereIndex].scale = vec3(toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7]));
 			g_spheres[sphereIndex].rgb = vec3(toFloat(vs[8]), toFloat(vs[9]), toFloat(vs[10]));
 			g_spheres[sphereIndex].Ka = toFloat(vs[11]);
 			g_spheres[sphereIndex].Kd = toFloat(vs[12]);
@@ -147,7 +147,7 @@ void parseLine(const vector<string>& vs)
 			g_spheres[sphereIndex].n = toFloat(vs[15]);
 
 			// Find sphere transform
-			g_spheres[sphereIndex].sphereTrans = Translate(g_spheres[sphereIndex].origin) * g_spheres[sphereIndex].scale;
+			g_spheres[sphereIndex].sphereTrans = Translate(g_spheres[sphereIndex].origin) * Scale(g_spheres[sphereIndex].scale);
 
 			// Find inverse sphere transform
 			InvertMatrix(g_spheres[sphereIndex].sphereTrans, g_spheres[sphereIndex].invSphereTrans);
@@ -254,7 +254,7 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = vec4(normalize(toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)), 0.0);
+				isectList[isectNum].norm = vec4(normalize((toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale)), 0.0);	// Division by scale necessary for ellipsoids
 				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -265,7 +265,7 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			if ((ray.origin + solution[1] * ray.dir).z <= -g_near && solution[1] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[1] * ray.dir;
-				isectList[isectNum].norm = vec4(normalize(toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)), 0.0);
+				isectList[isectNum].norm = vec4(normalize( (toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale) ) , 0.0);	// Division by scale necessary for ellipsoids
 				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -280,7 +280,7 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = vec4(normalize(toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)), 0.0);
+				isectList[isectNum].norm = vec4(normalize((toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale)), 0.0);	// Division by scale necessary for ellipsoids
 				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -372,13 +372,11 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 
             if (!inShadow(shadowRay, intersect, g_lights[p])) {   // If intersection not in shadow, light contributes color
                 // Sum up diffuse and specular components for each point light
-				if (dot(intersect.norm, light_dir) > 0) {
+				if (dot(intersect.norm, light_dir) > 0) {	// Only add diffuse component if diffuse dot product is positive (source: wikipedia /Phong_reflection_model)
 					color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(intersect.norm, light_dir) * targetSphere->rgb;
-					if (dot(reflectRay.dir, -ray.dir) > 0)
+					if (dot(reflectRay.dir, -ray.dir) > 0)	// Only add specular component if both diffuse and specular dot product are positive (source: wikipedia /Phong_reflection_model)
 						color_specular += targetSphere->Ks * g_lights[p].rgb * pow(dot(reflectRay.dir, -ray.dir), targetSphere->n);  // Need to normalize V before dotting with R
 				}
-				else
-					cout << "here";
             }
 		}
 		color_ambient = targetSphere->Ka * (targetSphere->rgb * g_ambient);
