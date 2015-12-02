@@ -34,7 +34,7 @@ struct Sphere
 	float Kd;				// Diffuse coeffecient
 	float Ks;				// Specular coeffecient
 	float Kr;				// Reflective coeffecient
-	float n;				// Shininess
+	float n;				// Shininess (used for specular component)
 	mat4 sphereTrans;
 	mat4 invSphereTrans;
 };
@@ -332,12 +332,13 @@ bool inShadow(const Ray &shadowRay, const Intersect &intersect, const Light &lig
 // -------------------------------------------------------------------
 // Ray tracing
 
-vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
+vec4 trace(const Ray &ray, int recurseDepth = g_recurse)
 {
-    // TODO: implement your ray tracing routine here.
+    // DONE: implement your ray tracing routine here.
     Intersect intersect;
 	Sphere *targetSphere;
-	Ray reflectRay;
+	Ray reflectLightRay;
+	Ray reflectViewerRay;
     Ray shadowRay;
 	vec4 light_dir;
 	vec4 color_total;
@@ -346,7 +347,6 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 	vec3 color_specular = vec3();
 	vec3 color_local = vec3();
 	vec4 color_reflected = vec4(0.0f, 0.0f, 0.0f, 1.0f);
-	
 
 	// Find intersection of ray for each sphere and pass back 'intersect' var with intersection closest to camera
 	if (!IntersectRay(ray, intersect)) {  // If no intersection then assign background color to pixel
@@ -357,14 +357,16 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 		targetSphere = &g_spheres[intersect.sphereNum];
 
 		// Find outgoing (reflected) ray based off incoming ray and intersect normal
-		reflectRay.origin = intersect.pos;
-		
+		reflectLightRay.origin = intersect.pos;
+		reflectViewerRay.origin = intersect.pos;
+		reflectViewerRay.dir = normalize(ray.dir - 2 * dot(ray.dir, intersect.norm) * intersect.norm);
+
 		for (int p = 0; p < lightIndex; p++) {	// For all light sources...
 			// Get light direction from intersect point (normalized)
 			light_dir = normalize(g_lights[p].origin - intersect.pos);
 			
 			// Find reflection direction of point light (to be used later)
-			reflectRay.dir = normalize(2 * dot(light_dir, intersect.norm) * intersect.norm - light_dir);		// Need to normalize? TODO
+			reflectLightRay.dir = normalize(2 * dot(light_dir, intersect.norm) * intersect.norm - light_dir);
             
 			// Determine shadowRay specific to point light
 			shadowRay.dir = light_dir;
@@ -374,8 +376,8 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
                 // Sum up diffuse and specular components for each point light
 				if (dot(intersect.norm, light_dir) > 0) {	// Only add diffuse component if diffuse dot product is positive (source: wikipedia /Phong_reflection_model)
 					color_diffuse += targetSphere->Kd * g_lights[p].rgb * dot(intersect.norm, light_dir) * targetSphere->rgb;
-					if (dot(reflectRay.dir, -ray.dir) > 0)	// Only add specular component if both diffuse and specular dot product are positive (source: wikipedia /Phong_reflection_model)
-						color_specular += targetSphere->Ks * g_lights[p].rgb * pow(dot(reflectRay.dir, -ray.dir), targetSphere->n);  // Need to normalize V before dotting with R
+					if (dot(reflectLightRay.dir, -ray.dir) > 0)	// Only add specular component if both diffuse and specular dot product are positive (source: wikipedia /Phong_reflection_model)
+						color_specular += targetSphere->Ks * g_lights[p].rgb * pow(dot(reflectLightRay.dir, -ray.dir), targetSphere->n);  // Need to normalize V before dotting with R
 				}
             }
 		}
@@ -383,11 +385,13 @@ vec4 trace(const Ray& ray, int recurseDepth = g_recurse)
 		color_local = color_ambient + color_diffuse + color_specular;
 
 		// Recursive call trace to find color_reflected
-		if (recurseDepth > 0)
-			color_reflected = trace(reflectRay, recurseDepth - 1);
-
+		if (recurseDepth > 0) {
+			color_reflected = trace(reflectViewerRay, recurseDepth - 1);
+			if (color_reflected == vec4(g_background))	// If color_reflected is just background, then don't use it
+				color_reflected = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		}
 		// Add up colors and scale color_reflected by sphere's Kr
-		color_total = vec4(color_local, 0.0) + targetSphere->Kr * color_reflected;
+		color_total = vec4(color_local) + targetSphere->Kr * color_reflected;
 		return color_total;
 	}	
 }

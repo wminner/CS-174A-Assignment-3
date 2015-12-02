@@ -384,6 +384,17 @@ struct vec4 {
         float r = float(1.0) / s;
         return *this * r;
     }
+	
+	//
+    //  --- Boolean Operators ---
+    //
+	
+	bool operator == ( const vec4& v ) const {
+		if (x == v.x && y == v.y && z == v.z && w == v.w)
+			return true;
+		else
+			return false;
+	}
 
     //
     //  --- (modifying) Arithematic Operators ---
