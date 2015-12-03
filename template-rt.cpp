@@ -23,7 +23,7 @@ struct Ray
     vec4 dir;
 };
 
-// TODO: add structs for spheres, lights and anything else you may need.
+// DONE: add structs for spheres, lights and anything else you may need.
 struct Sphere
 {
 	string name;
@@ -211,8 +211,6 @@ void loadFile(const char* filename)
 void setColor(int ix, int iy, const vec4& color)
 {
     int iy2 = g_height - iy - 1; // Invert iy coordinate.
-	//if (iy2*g_width + ix == 41209)
-	//	cout << "here";
     g_colors[iy2 * g_width + ix] = color;
 }
 
@@ -251,10 +249,10 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			solution[1] = -1 * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)) - sqrt(determ)) / cabs_squared;
 			
 			// Save first intersection if within frustrum
-			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
+			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times in frustrum.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = vec4(normalize((toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale)), 0.0);	// Division by scale necessary for ellipsoids
+				isectList[isectNum].norm = vec4(normalize((toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale)), 0.0);	// Division by scale^2 necessary for ellipsoids
 				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -262,10 +260,10 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			}
 
 			// Save second intersection if within frustrum
-			if ((ray.origin + solution[1] * ray.dir).z <= -g_near && solution[1] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
+			if ((ray.origin + solution[1] * ray.dir).z <= -g_near && solution[1] >= 0.0001f) {	// Only take positive times in frustrum.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[1] * ray.dir;
-				isectList[isectNum].norm = vec4(normalize( (toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale) ) , 0.0);	// Division by scale necessary for ellipsoids
+				isectList[isectNum].norm = vec4(normalize( (toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale) ) , 0.0);	// Division by scale^2 necessary for ellipsoids
 				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -277,10 +275,10 @@ bool IntersectRay(const Ray &ray, Intersect &intersect)
 			solution[0] = -1 * (dot(toVec3(rayPrime.origin), toVec3(rayPrime.dir)) + sqrt(determ)) / cabs_squared;
 
 			// Save only intersection if within frustrum
-			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times.  Use 0.0001 so it doesn't intersect itself due to rounding error.
+			if ((ray.origin + solution[0] * ray.dir).z <= -g_near && solution[0] >= 0.0001f) {	// Only take positive times in frustrum.  Use 0.0001 so it doesn't intersect itself due to rounding error.
 				isectList.push_back(Intersect());
 				isectList[isectNum].pos = ray.origin + solution[0] * ray.dir;
-				isectList[isectNum].norm = vec4(normalize((toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale)), 0.0);	// Division by scale necessary for ellipsoids
+				isectList[isectNum].norm = vec4(normalize((toVec3(isectList[isectNum].pos) - toVec3(g_spheres[i].origin)) / (g_spheres[i].scale * g_spheres[i].scale)), 0.0);	// Division by scale^2 necessary for ellipsoids
 				isectList[isectNum].dist = length(toVec3(isectList[isectNum].pos) - toVec3(ray.origin));
 				isectList[isectNum].sphereNum = i;
 				isectNum++;
@@ -311,7 +309,7 @@ bool inShadow(const Ray &shadowRay, const Intersect &intersect, const Light &lig
     float dist_light;
     Intersect shadowIntersect;
     
-    // If dot product of intersect normal and shadowRay direction is negative, then return true
+    // If dot product of intersect normal and shadowRay direction is negative, then return true because object shadowing itself
     if (dot(shadowRay.dir, intersect.norm) < 0)
         return true;
     
@@ -332,13 +330,13 @@ bool inShadow(const Ray &shadowRay, const Intersect &intersect, const Light &lig
 // -------------------------------------------------------------------
 // Ray tracing
 
-vec4 trace(const Ray &ray, int recurseDepth = g_recurse)
+vec4 trace(const Ray &ray, bool &objFound, int recurseDepth = g_recurse)
 {
     // DONE: implement your ray tracing routine here.
     Intersect intersect;
 	Sphere *targetSphere;
-	Ray reflectLightRay;
-	Ray reflectViewerRay;
+	Ray reflectLightRay;    // Reflection of light ray (used for diffuse and specular components)
+	Ray reflectViewerRay;   // Reflection of viewer ray (used for reflect trace)
     Ray shadowRay;
 	vec4 light_dir;
 	vec4 color_total;
@@ -347,13 +345,16 @@ vec4 trace(const Ray &ray, int recurseDepth = g_recurse)
 	vec3 color_specular = vec3();
 	vec3 color_local = vec3();
 	vec4 color_reflected = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    bool nextObjFound = false;  // Used to detect if reflect color is valid for tracing reflectRay
 
 	// Find intersection of ray for each sphere and pass back 'intersect' var with intersection closest to camera
 	if (!IntersectRay(ray, intersect)) {  // If no intersection then assign background color to pixel
-		return vec4(g_background);
+        objFound = false;
+        return vec4(g_background);
 	}
-	else {
-		// Get sphere based off intersection
+	else {  // Intersection found
+        objFound = true;
+        // Get sphere based off intersection
 		targetSphere = &g_spheres[intersect.sphereNum];
 
 		// Find outgoing (reflected) ray based off incoming ray and intersect normal
@@ -365,7 +366,7 @@ vec4 trace(const Ray &ray, int recurseDepth = g_recurse)
 			// Get light direction from intersect point (normalized)
 			light_dir = normalize(g_lights[p].origin - intersect.pos);
 			
-			// Find reflection direction of point light (to be used later)
+			// Find reflection direction of point light (to be used later for specular component)
 			reflectLightRay.dir = normalize(2 * dot(light_dir, intersect.norm) * intersect.norm - light_dir);
             
 			// Determine shadowRay specific to point light
@@ -386,8 +387,8 @@ vec4 trace(const Ray &ray, int recurseDepth = g_recurse)
 
 		// Recursive call trace to find color_reflected
 		if (recurseDepth > 0) {
-			color_reflected = trace(reflectViewerRay, recurseDepth - 1);
-			if (color_reflected == vec4(g_background))	// If color_reflected is just background, then don't use it
+			color_reflected = trace(reflectViewerRay, nextObjFound, recurseDepth - 1);
+            if (!nextObjFound)  // If no object found from reflect trace, then set color_reflect to 0 (so we don't use background color)
 				color_reflected = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		}
 		// Add up colors and scale color_reflected by sphere's Kr
@@ -415,11 +416,12 @@ vec4 getDir(int ix, int iy)
 void renderPixel(int ix, int iy)
 {
     Ray ray;
+    bool objFound = false;  // Not used. Only used for reflect traces.
+    
     ray.origin = vec4(0.0f, 0.0f, 0.0f, 1.0f);
     ray.dir = getDir(ix, iy);
-	//if (iy == 531 && ix == 409)
-	//	cout << "here";
-    vec4 color = trace(ray);
+
+    vec4 color = trace(ray, objFound);
     setColor(ix, iy, color);
 }
 
@@ -466,15 +468,13 @@ void saveFile(char *inName)
         for (int x = 0; x < g_width; x++)
 			for (int i = 0; i < 3; i++) {		// Go through r, g, b values (skip alpha channel)
 				temp = ((float*)g_colors[y*g_width + x])[i];
-				//if (y*g_width + x == 41209)
-				//	cout << "here";
-				temp = (temp > 1 ? 1 : temp);
+				temp = (temp > 1 ? 1 : temp);   // Clamp color to 1 max
 				buf[y*g_width*3 + x*3 + i] = (unsigned char)(temp * 255.9f);
 			}
     // DONE: change file name based on input file name.
 	savePPM(g_width, g_height, outName, buf);
     delete[] buf;
-	free(outName);
+	free(outName);  // Free memory we used malloc for initially
 }
 
 
