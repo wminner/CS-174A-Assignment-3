@@ -1,16 +1,38 @@
-========================================================================
-    template-rt: Template for ray tracer
-========================================================================
+Wesley Minner
+703549234
+CS 174A
+Dis 1B, Fall 2015
 
-Contents of the project:
+***Project 3 - Ray Tracer***
 
-- template-rt.cpp: main source file
-- matm.h: modified mat.h from Edward Angel. Code to invert a matrix 
-  was added there (function InvertMatrix).
-- vecm.h: modified vec.h from Edward Angel.
+Files modified..................................................................
+-vecm.h
+-template-rt.cpp
 
-You may modify template-rt.cpp as you wish.
+Files unmodified (so not included in the zip)...................................
+-matm.h
 
-Look for comment lines starting with TODO. These are are important
-places where most of your code will be added.
+File modifications..............................................................
+vecm.h
+-Add operator support for (vec3 / vec3)
+-Add operator support for (vec4 == vec4)
 
+template-rt.cpp
+-Code for the raytracer
+
+Tests passed....................................................................
+-testAmbient
+-testBackground
+-testBehind
+-testDiffuse
+-testIllum
+-testImgPlane
+-testIntersection
+-testParsing
+-testReflection
+-testSample
+-testShadow
+-testSpecular
+
+Tests failed....................................................................
+-N/A
